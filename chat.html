@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hastane Otomasyon Sistemi</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f1c40f;
+            --light: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar h2 {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-add { background-color: var(--secondary); color: white; }
+        .btn-accept { background-color: var(--warning); color: #000; }
+        .btn-discharge { background-color: var(--success); color: white; }
+        .btn-delete { background-color: var(--danger); color: white; }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            min-height: 400px;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            border-bottom: 2px solid var(--light);
+            padding-bottom: 10px;
+            color: var(--primary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .patient-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .patient-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-beklemede { background: #ffeaa7; color: #d6a312; }
+        .status-tedavi { background: #81ecec; color: #008b8b; }
+        .status-taburcu { background: #55efc4; color: #00b894; }
+
+        .log-container {
+            margin-top: 20px;
+            background: #2d3436;
+            color: #fab1a0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2><i class="fas fa-hospital-user"></i> HASTANE PANELİ</h2>
+    
+    <div class="input-group">
+        <label>Hasta ID</label>
+        <input type="number" id="patientId" placeholder="Örn: 101">
+        <label>Hasta Adı Soyadı</label>
+        <input type="text" id="patientName" placeholder="Örn: Ahmet Yılmaz">
+    </div>
+
+    <button class="btn-add" onclick="hastaEkle()">
+        <i class="fas fa-plus"></i> Hasta Ekle (Kuyruk)
+    </button>
+    <button class="btn-accept" onclick="hastaKabul()">
+        <i class="fas fa-stethoscope"></i> Sıradaki Hastayı Kabul Et
+    </button>
+    <button class="btn-discharge" onclick="taburcuEt()">
+        <i class="fas fa-check-double"></i> Tedaviyi Bitir ve Taburcu Et
+    </button>
+    <button class="btn-delete" onclick="hataliHastaSil()">
+        <i class="fas fa-user-minus"></i> Son Kaydı Sil (Hatalı Giriş)
+    </button>
+
+    <div class="log-container" id="logs">
+        > Sistem hazır...
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="dashboard">
+        <div class="card">
+            <h3>Mevcut Kuyruk <span id="countKuyruk" style="font-size: 0.9rem; color: #7f8c8d;">(0)</span></h3>
+            <ul id="kuyrukListesi" class="patient-list">
+                </ul>
+        </div>
+
+        <div class="card">
+            <h3>Taburcu Olanlar <span id="countTaburcu" style="font-size: 0.9rem; color: #7f8c8d;">(0)</span></h3>
+            <ul id="taburcuListesi" class="patient-list">
+                </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    let kuyruk = [];
+    let taburcuOlanlar = [];
+
+    function logYaz(mesaj) {
+        const logBox = document.getElementById('logs');
+        logBox.innerHTML += `<br>> ${mesaj}`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function arayuzGuncelle() {
+        const kListe = document.getElementById('kuyrukListesi');
+        const tListe = document.getElementById('taburcuListesi');
+        
+        // Listeleri temizle
+        kListe.innerHTML = '';
+        tListe.innerHTML = '';
+
+        // Kuyruğu Render Et
+        kuyruk.forEach(h => {
+            const statusClass = h.durum === 'Tedavi Ediliyor' ? 'status-tedavi' : 'status-beklemede';
+            kListe.innerHTML += `
+                <li class="patient-item">
+                    <div>
+                        <strong>#${h.id} ${h.isim}</strong>
+                    </div>
+                    <span class="badge ${statusClass}">${h.durum}</span>
+                </li>`;
+        });
+
+        // Taburcuları Render Et
+        taburcuOlanlar.forEach(h => {
+            tListe.innerHTML += `
+                <li class="patient-item">
+                    <div>
+                        <strong>#${h.id} ${h.isim}</strong>
+                    </div>
+                    <span class="badge status-taburcu">Taburcu Edildi</span>
+                </li>`;
+        });
+
+        document.getElementById('countKuyruk').innerText = `(${kuyruk.length})`;
+        document.getElementById('countTaburcu').innerText = `(${taburcuOlanlar.length})`;
+    }
+
+    function hastaEkle() {
+        const id = document.getElementById('patientId').value;
+        const isim = document.getElementById('patientName').value;
+
+        if(!id || !isim) {
+            alert("Lütfen ID ve İsim giriniz!");
+            return;
+        }
+
+        const yeniHasta = {
+            id: id,
+            isim: isim,
+            durum: "Beklemede"
+        };
+
+        kuyruk.push(yeniHasta);
+        logYaz(`Hasta eklendi: ${isim}`);
+        
+        // Inputları temizle
+        document.getElementById('patientId').value = '';
+        document.getElementById('patientName').value = '';
+        arayuzGuncelle();
+    }
+
+    function hastaKabul() {
+        if(kuyruk.length === 0) {
+            logYaz("Hata: Kabul edilecek hasta yok!");
+            return;
+        }
+
+        if(kuyruk[0].durum === "Tedavi Ediliyor") {
+            logYaz(`Uyarı: ${kuyruk[0].isim} zaten tedavide.`);
+        } else {
+            kuyruk[0].durum = "Tedavi Ediliyor";
+            logYaz(`Kabul edildi: ${kuyruk[0].isim} (Tedaviye başlandı)`);
+        }
+        arayuzGuncelle();
+    }
+
+    function taburcuEt() {
+        if(kuyruk.length === 0) {
+            logYaz("Hata: Taburcu edilecek kimse yok!");
+            return;
+        }
+
+        if(kuyruk[0].durum !== "Tedavi Ediliyor") {
+            logYaz("Hata: Tedavi edilmeyen hasta taburcu edilemez!");
+            return;
+        }
+
+        let hasta = kuyruk.shift(); // İlk elemanı çıkar (C'deki free(temp))
+        taburcuOlanlar.push(hasta);
+        logYaz(`Başarıyla taburcu edildi: ${hasta.isim}`);
+        arayuzGuncelle();
+    }
+
+    function hataliHastaSil() {
+        if(kuyruk.length === 0) {
+            logYaz("Hata: Silinecek kayıt yok!");
+            return;
+        }
+        
+        // C kodundaki mantık: Listenin sonundaki elemanı siler
+        let silinen = kuyruk.pop();
+        logYaz(`Son kayıt hatalı olduğu için silindi: ${silinen.isim}`);
+        arayuzGuncelle();
+    }
+</script>
+
+</body>
+</html>
