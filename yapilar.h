@@ -8,7 +8,7 @@
 #define MAX_SALON 5
 #define INF 99999
 
-// Her bir randevuyu temsil eden yapı
+// 1. Randevu Modeli
 typedef struct Randevu {
     int id;
     char isim[50];
@@ -16,7 +16,7 @@ typedef struct Randevu {
     int bitis;     
 } Randevu;
 
-// AVL + Interval Tree düğümü [Zorunlu Şart 1]
+// 2. AVL + Interval Tree (Dengeli Ağaç Şartı)
 typedef struct IntervalNode {
     Randevu *veri;
     int max_bitis; 
@@ -24,13 +24,13 @@ typedef struct IntervalNode {
     int yukseklik; 
 } IntervalNode;
 
-// Geri Al (Undo) işlemi için Yığın (Stack) yapısı [Zorunlu Şart 4]
+// 3. Stack (Undo/Geri Al Şartı)
 typedef struct StackNode {
-    int silinecekID;
+    int id;
     struct StackNode *sonraki;
 } StackNode;
 
-// Bekleme listesi için Kuyruk (Queue) yapısı [Zorunlu Şart 4]
+// 4. Queue (Bekleme Listesi/Görev Kuyruğu Şartı)
 typedef struct KuyrukNode {
     Randevu veri;
     struct KuyrukNode *sonraki;

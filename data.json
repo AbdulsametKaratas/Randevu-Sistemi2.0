@@ -1,6 +1,8 @@
 [
   {"id": 1, "isim": "Anan", "baslangic": 720, "bitis": 451},
+  {"id": 5, "isim": "pembe furkan", "baslangic": 720, "bitis": 526},
   {"id": 2, "isim": "samet", "baslangic": 750, "bitis": 810},
   {"id": 3, "isim": "ulaŸg”ttensiker", "baslangic": 870, "bitis": 920},
-  {"id": 4, "isim": "baban", "baslangic": 930, "bitis": 1110}
+  {"id": 4, "isim": "baban", "baslangic": 930, "bitis": 1110},
+  {"id": 6, "isim": ".40", "baslangic": 1120, "bitis": 1150}
 ]
