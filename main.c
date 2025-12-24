@@ -4,7 +4,6 @@
 #include "yapilar.h"
 
 // --- YARDIMCI FONKSİYONLAR ---
-
 int maksimum(int a, int b) { return (a > b) ? a : b; }
 int yukseklikAl(IntervalNode *n) { return (n == NULL) ? 0 : n->yukseklik; }
 
@@ -20,35 +19,34 @@ int dengeFaktoruAl(IntervalNode *n) {
     return (n == NULL) ? 0 : yukseklikAl(n->sol) - yukseklikAl(n->sag);
 }
 
-// --- ROTASYONLAR VE INTERVAL TREE MANTIĞI ---
-
+// --- ROTASYONLAR ---
 IntervalNode* sagaDondur(IntervalNode *y) {
     IntervalNode *x = y->sol;
     IntervalNode *T2 = x->sag;
-    x->sag = y;
-    y->sol = T2;
+    x->sag = y; y->sol = T2;
     y->yukseklik = maksimum(yukseklikAl(y->sol), yukseklikAl(y->sag)) + 1;
     x->yukseklik = maksimum(yukseklikAl(x->sol), yukseklikAl(x->sag)) + 1;
-    maxBitisGuncelle(y);
-    maxBitisGuncelle(x);
+    maxBitisGuncelle(y); maxBitisGuncelle(x);
     return x;
 }
 
 IntervalNode* solaDondur(IntervalNode *x) {
     IntervalNode *y = x->sag;
     IntervalNode *T2 = y->sol;
-    y->sol = x;
-    x->sag = T2;
+    y->sol = x; x->sag = T2;
     x->yukseklik = maksimum(yukseklikAl(x->sol), yukseklikAl(x->sag)) + 1;
     y->yukseklik = maksimum(yukseklikAl(y->sol), yukseklikAl(y->sag)) + 1;
-    maxBitisGuncelle(x);
-    maxBitisGuncelle(y);
+    maxBitisGuncelle(x); maxBitisGuncelle(y);
     return y;
 }
 
+// --- ÇAKIŞMA VE EKLEME MANTIĞI ---
 int cakismaVarMi(Randevu r1, Randevu r2) {
     return (r1.baslangic < r2.bitis && r2.baslangic < r1.bitis);
 }
+
+// Global başarı bayrağı (Kayıt tetiklemek için)
+int sonIslemBasarili = 0;
 
 IntervalNode* dugumOlustur(Randevu r) {
     IntervalNode* yeni = (IntervalNode*)malloc(sizeof(IntervalNode));
@@ -57,6 +55,7 @@ IntervalNode* dugumOlustur(Randevu r) {
     yeni->max_bitis = r.bitis;
     yeni->sol = yeni->sag = NULL;
     yeni->yukseklik = 1;
+    sonIslemBasarili = 1; 
     return yeni;
 }
 
@@ -64,8 +63,9 @@ IntervalNode* randevuEkle(IntervalNode* kok, Randevu r, int sessizMod) {
     if (kok == NULL) return dugumOlustur(r);
 
     if (cakismaVarMi(r, *(kok->veri))) {
-        if (!sessizMod) printf("\aHATA: ID %d ile çakışma var! (%02d:%02d)\n", 
+        if (!sessizMod) printf("\aHATA: ID %d ile cakisma var! (%02d:%02d)\n", 
                                kok->veri->id, kok->veri->baslangic/60, kok->veri->baslangic%60);
+        sonIslemBasarili = 0;
         return kok;
     }
 
@@ -81,17 +81,34 @@ IntervalNode* randevuEkle(IntervalNode* kok, Randevu r, int sessizMod) {
     if (denge > 1 && r.baslangic < kok->sol->veri->baslangic) return sagaDondur(kok);
     if (denge < -1 && r.baslangic > kok->sag->veri->baslangic) return solaDondur(kok);
     if (denge > 1 && r.baslangic > kok->sol->veri->baslangic) {
-        kok->sol = solaDondur(kok->sol);
-        return sagaDondur(kok);
+        kok->sol = solaDondur(kok->sol); return sagaDondur(kok);
     }
     if (denge < -1 && r.baslangic < kok->sag->veri->baslangic) {
-        kok->sag = sagaDondur(kok->sag);
-        return solaDondur(kok);
+        kok->sag = sagaDondur(kok->sag); return solaDondur(kok);
     }
     return kok;
 }
 
-// --- DOSYA VE SIRALAMA (QUICKSORT) ---
+// --- DOSYA İŞLEMLERİ (JSON & CSV) ---
+void jsonKaydet(IntervalNode *kok, FILE *fp, int *ilk) {
+    if (kok == NULL) return;
+    jsonKaydet(kok->sol, fp, ilk);
+    if (!(*ilk)) fprintf(fp, ",\n");
+    fprintf(fp, "  {\"id\": %d, \"isim\": \"%s\", \"baslangic\": %d, \"bitis\": %d}", 
+            kok->veri->id, kok->veri->isim, kok->veri->baslangic, kok->veri->bitis);
+    *ilk = 0;
+    jsonKaydet(kok->sag, fp, ilk);
+}
+
+void jsonDosyasiOlustur(IntervalNode *kok) {
+    FILE *fp = fopen("data.json", "w");
+    if (fp == NULL) return;
+    fprintf(fp, "[\n");
+    int ilk = 1;
+    jsonKaydet(kok, fp, &ilk);
+    fprintf(fp, "\n]");
+    fclose(fp);
+}
 
 void csvKaydet(Randevu r) {
     FILE *fp = fopen("randevular.csv", "a");
@@ -106,11 +123,12 @@ void csvdenYukle(IntervalNode** kok) {
     if (fp == NULL) return;
     Randevu r;
     while (fscanf(fp, "%d,%[^,],%d,%d\n", &r.id, r.isim, &r.baslangic, &r.bitis) != EOF) {
-        *kok = randevuEkle(*kok, r, 1); // Yüklerken hata mesajı basmasın
+        *kok = randevuEkle(*kok, r, 1);
     }
     fclose(fp);
 }
 
+// --- SIRALAMA VE ARAMA ---
 void quicksort(Randevu dizi[], int dusuk, int yuksek) {
     if (dusuk < yuksek) {
         int pivot = dizi[yuksek].id;
@@ -127,24 +145,17 @@ void quicksort(Randevu dizi[], int dusuk, int yuksek) {
         quicksort(dizi, pi + 1, yuksek);
     }
 }
-// ID'ye göre Binary Search (İkili Arama) Algoritması
+
 int binarySearchID(Randevu dizi[], int dusuk, int yuksek, int arananID) {
     while (dusuk <= yuksek) {
         int orta = dusuk + (yuksek - dusuk) / 2;
-
-        // ID bulundu mu?
-        if (dizi[orta].id == arananID)
-            return orta;
-
-        // ID daha büyükse sağ tarafa bak
-        if (dizi[orta].id < arananID)
-            dusuk = orta + 1;
-        // ID daha küçükse sol tarafa bak
-        else
-            yuksek = orta - 1;
+        if (dizi[orta].id == arananID) return orta;
+        if (dizi[orta].id < arananID) dusuk = orta + 1;
+        else yuksek = orta - 1;
     }
-    return -1; // Bulunamadı
+    return -1;
 }
+
 int diziyeAktar(IntervalNode *kok, Randevu dizi[], int index) {
     if (kok == NULL) return index;
     index = diziyeAktar(kok->sol, dizi, index);
@@ -152,39 +163,20 @@ int diziyeAktar(IntervalNode *kok, Randevu dizi[], int index) {
     index = diziyeAktar(kok->sag, dizi, index);
     return index;
 }
-void jsonKaydet(IntervalNode *kok, FILE *fp, int *ilk) {
-    if (kok == NULL) return;
-    jsonKaydet(kok->sol, fp, ilk);
-    
-    if (!(*ilk)) fprintf(fp, ",\n");
-    fprintf(fp, "  {\"id\": %d, \"isim\": \"%s\", \"baslangic\": %d, \"bitis\": %d}", 
-            kok->veri->id, kok->veri->isim, kok->veri->baslangic, kok->veri->bitis);
-    *ilk = 0;
-    
-    jsonKaydet(kok->sag, fp, ilk);
-}
 
-void jsonDosyasiOlustur(IntervalNode *kok) {
-    FILE *fp = fopen("data.json", "w");
-    if (fp == NULL) return;
-    fprintf(fp, "[\n");
-    int ilk = 1;
-    jsonKaydet(kok, fp, &ilk);
-    fprintf(fp, "\n]");
-    fclose(fp);
-}
 // --- ANA MENÜ ---
-
 int main() {
     IntervalNode* kok = NULL;
     int secim;
     csvdenYukle(&kok);
+    jsonDosyasiOlustur(kok);
 
     do {
         printf("\n=== MEDENIYET RANDEVU SISTEMI ===\n");
         printf("1. Yeni Randevu Ekle\n");
-        printf("2. Sirali Randevulari Listele (Quicksort)\n");
-        printf("3. Cikis\n");
+        printf("2. Sirali Listele (Quicksort - ID)\n");
+        printf("3. Randevu Ara (Binary Search - ID)\n");
+        printf("4. Cikis\n");
         printf("Seciminiz: ");
         scanf("%d", &secim);
 
@@ -195,15 +187,16 @@ int main() {
             printf("Isim: "); scanf(" %[^\n]s", yeni.isim);
             printf("Baslangic (SS:DD): "); scanf("%d:%d", &s1, &d1);
             printf("Bitis (SS:DD): "); scanf("%d:%d", &s2, &d2);
-            
             yeni.baslangic = s1 * 60 + d1;
             yeni.bitis = s2 * 60 + d2;
 
-            IntervalNode* yeni_kok = randevuEkle(kok, yeni, 0);
-            if (yeni_kok != kok || kok == NULL) {
-                kok = yeni_kok;
+            sonIslemBasarili = 0; // Bayrağı sıfırla
+            kok = randevuEkle(kok, yeni, 0);
+            
+            if (sonIslemBasarili) {
                 csvKaydet(yeni);
-                printf("Basariyla kaydedildi!\n");
+                jsonDosyasiOlustur(kok);
+                printf("Basariyla kaydedildi ve Web guncellendi!\n");
             }
         } 
         else if (secim == 2) {
@@ -211,8 +204,8 @@ int main() {
             int adet = diziyeAktar(kok, liste, 0);
             if (adet == 0) printf("Kayitli randevu yok.\n");
             else {
-                quicksort(liste, 0, adet - 1);
-                printf("\n--- GUNLUK PROGRAM ---\n");
+                quicksort(liste, 0, adet - 1); 
+                printf("\n--- GÜNLÜK PROGRAM (SIRALI) ---\n");
                 for(int i=0; i<adet; i++) {
                     printf("[%02d:%02d - %02d:%02d] ID:%d | %s\n", 
                            liste[i].baslangic/60, liste[i].baslangic%60,
@@ -225,26 +218,14 @@ int main() {
             int aranan;
             Randevu liste[200];
             int adet = diziyeAktar(kok, liste, 0);
-            
-            // Arama öncesi ID'ye göre sıralama şart!
+            if (adet == 0) { printf("Arama yapacak veri yok.\n"); continue; }
             quicksort(liste, 0, adet - 1); 
-
-            printf("Aranacak Randevu ID: ");
-            scanf("%d", &aranan);
-
+            printf("Aranacak Randevu ID: "); scanf("%d", &aranan);
             int sonuc = binarySearchID(liste, 0, adet - 1, aranan);
-
-            if (sonuc != -1) {
-                printf("\n--- RANDEVU BULUNDU ---\n");
-                printf("ID: %d | Isim: %s\n", liste[sonuc].id, liste[sonuc].isim);
-                printf("Saat: %02d:%02d - %02d:%02d\n", 
-                        liste[sonuc].baslangic/60, liste[sonuc].baslangic%60,
-                        liste[sonuc].bitis/60, liste[sonuc].bitis%60);
-            } else {
-                printf("Hata: %d ID'li bir randevu kaydi bulunamadi.\n", aranan);
-            }
+            if (sonuc != -1) printf("\nBULDUM: %s (Saat: %02d:%02d)\n", liste[sonuc].isim, liste[sonuc].baslangic/60, liste[sonuc].baslangic%60);
+            else printf("Hata: ID %d bulunamadi.\n", aranan);
         }
-    } while (secim != 3);
+    } while (secim != 4);
 
     return 0;
 }

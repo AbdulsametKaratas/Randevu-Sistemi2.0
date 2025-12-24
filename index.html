@@ -61,7 +61,7 @@
         async function verileriGetir() {
             try {
                 // Live Server sayesinde bu dosya anlık okunur
-                const response = await fetch('data.json');
+                const response = await fetch('data.json?t=' + new Date().getTime());
                 if (!response.ok) throw new Error();
                 
                 const veriler = await response.json();
